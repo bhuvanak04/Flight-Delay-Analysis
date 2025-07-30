@@ -1,6 +1,6 @@
 ---
-title: "Flight Club Final Report"
-author: "Rithi Krishnaraj, Bhuvana Kotha, Trisha Siva, Preethi Thota, Will Kirkpatrick, Joshua Wang"
+title: "NYC Flight Delay Analysis"
+author: "Bhuvana Kotha"
 date: "2025-06-09"
 output:
   html_document: default
@@ -23,28 +23,26 @@ library(ggplot2)
 
 ### Background & Purpose
 
-For our project, we are going to explore the causes of flight delays in New York airports in 2013 through analysis of the `nycflights13` dataset. Flight delays impacts millions of people who use airplanes every day, and delays can cause various problems such as financial loss, frustration, and missing connection flights. By identifying key factors that predict flight delays, many airlines can improve scheduling. By conducting this analysis, we hope to increase the efficiency of airports and decrease problems faced due to flight delays. 
+Flight delays impact millions of people who use airplanes every day, and delays can cause various problems such as financial loss, frustration, and missing connection flights. By identifying key factors that predict flight delays, many airlines can improve scheduling. By conducting this analysis, I hope to identify ways to increase the efficiency of airports and decrease the problems faced due to flight delays. 
 
 ### Research Questions
 
-We will conduct out analysis by splitting it into 6 research questions about individual factors of interest. We want to determine if they are significant factors behind flight delays. If they seemed to affect flight delays, we also wanted to identify how much of an impact they had.
-
-1) *Does the time of year influence flight delays? (Bhuvana)*
+1) *Does the time of year influence flight delays?*
   - Ho: Median departure delay is the same throughout the year
   - Ha: Median departure delay is different at least one part of the year
-2) *Which airline has the highest and lowest average delays? (Will)*
+2) *Which airline has the highest and lowest average delays? *
   - Ho: There is no significant difference between the departure times between airlines
   - Ha: There is a significant difference between the departure times between airlines
-3) *Does the distance traveled by the flight affect the delay departure of a flight? (Trisha)*
+3) *Does the distance traveled by the flight affect the delay departure of a flight?*
   - Ho: There is no correlation between the distance traveled and the departure delay of a flight.
   - Ha: There is a correlation between the distance traveled and the departure delay of a flight.
-4) *Do flights have more delays if it is a US public holiday, compared to regular days? (Preethi)*
+4) *Do flights have more delays if it is a US public holiday, compared to regular days?*
   - Ho: There is no difference in the departure delay between US public holidays and regular days.
   - Ha: There is a difference in the departure delay between US public holidays and regular days.
-5) *How do different weather conditions impact flight delays (like temperature, precipitation, visibility, etc)? (Rithi)*
+5) *How do different weather conditions impact flight delays (like temperature, precipitation, visibility, etc)?*
   - Ho: there is no difference between weather conditions in influencing flight delays
   - Ha: at least one weather condition is different in influencing flight delays
-6) *Does the day of the week influence departure delays? (Joshua)*
+6) *Does the day of the week influence departure delays?*
   - Ho: Departure delay is the same for every day of the week
   - Ha: At least one day of the week has significantly different departure delays than the other days of the week
 	
@@ -74,7 +72,7 @@ Our analysis focuses on the following factors:
 
 ### Data Cleaning and Processing
 
-To ensure accuracy of our analysis, we marked or deleted cancelled flights by setting dep_delay to NA, allowing us to handle cancellations in further analysis. We deleted all rows with zero distance or air_time since such observations weren't providing useful patterns. We truncated negative dep_delay to zero to avoid early departures from distorting the delay measures. We trimmed all the variables to remove the impact of outliers. We converted sched_dep_time, dep_time, sched_arr_time, and similar fields from HHMM ints to proper date-time variables, to enable the accurate calculations of wait time and to eliminate the need to group in performing the join with the weather data. Lastly, since the variable plane_age had many missing or idiosyncratic entries which reduced its utility, we omitted it from the majority of our analysis.
+To ensure accuracy of our analysis, I marked or deleted cancelled flights by setting dep_delay to NA, allowing us to handle cancellations in further analysis. I deleted all rows with zero distance or air_time since such observations weren't providing useful patterns. I truncated negative dep_delay to zero to avoid early departures from distorting the delay measures. I trimmed all the variables to remove the impact of outliers. I converted sched_dep_time, dep_time, sched_arr_time, and similar fields from HHMM ints to proper date-time variables, to enable the accurate calculations of wait time and to eliminate the need to group in performing the join with the weather data. Lastly, since the variable plane_age had many missing or idiosyncratic entries which reduced its utility, I omitted it from the majority of our analysis.
 
 \newpage
 
@@ -118,7 +116,7 @@ ggplot(flights_airline, aes(x = name, y = dep_delay)) +
 
 Here is a boxplot of departure delay (in minutes) versus carrier for three New York City airports: EWR, JFK, and LGA, carriers on the x-axis, departure delay from –25 through 110 minutes on y. Box plots cover IQR for each carrier–airport combination, with a bold line at the median; whiskers extend to 1.5 × IQR, and light points represent outliers. Central tendency and spread in on-time performance between terminals and between carriers are well represented in this plot.
 
-The mainline network airlines (Delta, JetBlue, American, United) cluster around a median at or slightly above zero, with reasonably narrow interquartile ranges (IQRs) on the order of 0–10 minutes. Regionals and low-cost carriers, such as ExpressJet, Frontier, and Mesa, on the other hand, have significantly larger IQRs (ranging from 10 to 30 minutes) with longer upper whiskers, indicating higher schedule volatility. Newark (EWR) is the worst for ExpressJet and Frontier, with medians in the 10–15 minute range and upper outliers exceeding 75 minutes. JFK, LGA, similarly, all have slightly negative median delays, but regionals systematically have a tail of extreme delays. Observe, however, that all airlines have some flights that are more than 100 minutes late, a reminder that even the best airlines occasionally have bad outliers. These EDA findings confirm that median departure delay is an appropriate summary measure for on-time performance, e.g., identifying the most sensitive airlines and airports to operating disturbances using the IQR width and even the presence of extreme outliers. From these, our objective is to predict the for every carrier, then build a regression model for delay for a given carrier, origin airport, weather, etc. We also segment the analysis by peak versus off-peak periods to control for slot saturation and isolate carrier effects even further.
+The mainline network airlines (Delta, JetBlue, American, United) cluster around a median at or slightly above zero, with reasonably narrow interquartile ranges (IQRs) on the order of 0–10 minutes. Regionals and low-cost carriers, such as ExpressJet, Frontier, and Mesa, on the other hand, have significantly larger IQRs (ranging from 10 to 30 minutes) with longer upper whiskers, indicating higher schedule volatility. Newark (EWR) is the worst for ExpressJet and Frontier, with medians in the 10–15 minute range and upper outliers exceeding 75 minutes. JFK, LGA, similarly, all have slightly negative median delays, but regionals systematically have a tail of extreme delays. Observe, however, that all airlines have some flights that are more than 100 minutes late, a reminder that even the best airlines occasionally have bad outliers. These EDA findings confirm that median departure delay is an appropriate summary measure for on-time performance, e.g., identifying the most sensitive airlines and airports to operating disturbances using the IQR width and even the presence of extreme outliers. From these, our objective is to predict the for every carrier, then build a regression model for delay for a given carrier, origin airport, weather, etc. I also segment the analysis by peak versus off-peak periods to control for slot saturation and isolate carrier effects even further.
 
 ### EDA 3: Scatter Plot with means for Relationship between Flight Distance and Departure Delay
 
@@ -160,7 +158,7 @@ ggplot(data = holidayf, mapping = aes(x = is_holiday, y = dep_delay, fill = is_h
   theme_minimal()
 ```
 
-This exploratory data analysis helped us to determine the relationship between holidays and flight delays, and find if it is a significant factor. From the violin plot in this EDA, we found that the distribution of both US holidays and non-holidays are similar. Both of the spreads also show consistent shorter delays, while there are a few longer delays. Based on the analysis, we can see that holidays do not particularly lead to longer delays. This helped us to recognize that even though there are likely not many differences between holiday delays and regular days, further analysis could be useful in finding any differences. We will use the t-test and linear regression to find any further observations. 
+This exploratory data analysis helped us to determine the relationship between holidays and flight delays, and find if it is a significant factor. From the violin plot in this EDA, I found that the distribution of both US holidays and non-holidays are similar. Both of the spreads also show consistent shorter delays, while there are a few longer delays. Based on the analysis, we can see that holidays do not particularly lead to longer delays. This helped to recognize that even though there are likely not many differences between holiday delays and regular days, further analysis could be useful in finding any differences. I will use the t-test and linear regression to find any further observations. 
 
 ### EDA 5: Violin Plots of Distribution of Departure Delays by Weather Conditions
 
@@ -214,7 +212,7 @@ v_visib
 v_humid
 ```
 
-From this exploratory data analysis, we found that flight delays increase at more extreme temperatures, usually under 30 degrees and above 80 degrees Fahrenheit. When precipitation is high, both the median delay and the spread of delays grows quickly, indicating that heavy rain influences the increase of departure delays. For wind speeds, high wind speeds start to show more variability and some delays. This could mean that wind speed isn’t a major determinant of flight delays. Reduced visibility correlates with longer delays, while departure punctuality worsens in foggy conditions. Finally, high humidity has a minimal impact on flight delays, especially less than precipitation or low visibility. 
+From this exploratory data analysis, I found that flight delays increase at more extreme temperatures, usually under 30 degrees and above 80 degrees Fahrenheit. When precipitation is high, both the median delay and the spread of delays grows quickly, indicating that heavy rain influences the increase of departure delays. For wind speeds, high wind speeds start to show more variability and some delays. This could mean that wind speed isn’t a major determinant of flight delays. Reduced visibility correlates with longer delays, while departure punctuality worsens in foggy conditions. Finally, high humidity has a minimal impact on flight delays, especially less than precipitation or low visibility. 
 
 ### EDA 6: Multiple Boxplot Graph - Distribution of Departure Delays by Day of the Week
 
@@ -329,7 +327,7 @@ head(carrier_delays,  3)   # three carriers with the smallest mean delay
 tail(carrier_delays,  3)   # three carriers with the largest mean delay
 ```
 
-We started off excluding flights data from any observations with missing departure-delay values, then merged with airlines lookup table such that a two-character carrier code was replaced with a complete airline name. We then grouped the cleaned data by carrier_name, then applied summarize() to calculate an airline’s average departure delay, its median departure delay, and its number of flights. We ordered carriers from least delayed average-wise by ordering on average_delay, then extracted three most delayed and three least delayed operators. We found that shortest average departure delays belonged to JetBlue Airways (mean 7.25 min), Delta Air Lines (8.03 min), and American Airlines (8.22 min), while longest average departure delays belonged to Frontier Airlines (20.22 min), ExpressJet Airlines (19.95 min), and Mesa Airlines (18.996 min). These observations indicate extreme on-time performance variation, partly caused by a few extreme delay incidents whose averages are inflated with small, regional carriers.
+I started off excluding flights data from any observations with missing departure-delay values, then merged with airlines lookup table such that a two-character carrier code was replaced with a complete airline name. I then grouped the cleaned data by carrier_name, then applied summarize() to calculate an airline’s average departure delay, its median departure delay, and its number of flights. I ordered carriers from least delayed average-wise by ordering on average_delay, then extracted three most delayed and three least delayed operators. I found that shortest average departure delays belonged to JetBlue Airways (mean 7.25 min), Delta Air Lines (8.03 min), and American Airlines (8.22 min), while longest average departure delays belonged to Frontier Airlines (20.22 min), ExpressJet Airlines (19.95 min), and Mesa Airlines (18.996 min). These observations indicate extreme on-time performance variation, partly caused by a few extreme delay incidents whose averages are inflated with small, regional carriers.
 
 ### Analysis 3: Distanve of Flight
 
@@ -362,7 +360,7 @@ Based on both the Pearson and Spearman correlation analyses, there is no meaning
 ### Analysis 4: Holidays
 
 ```{r, echo=FALSE}
-# These are some of the US public holidays that we think could potentially cause flight delays
+# These are some of the US public holidays that could potentially cause flight delays
 us_holidays <- as.Date(c(
   "2013-01-01",  # New Year's Day
   "2013-05-27",  # Memorial Day
@@ -401,7 +399,7 @@ lm_model <- lm(dep_delay ~ is_holiday, data = holidayf)
 summary(lm_model)
 ```
 
-To examine whether flight departure delays differ between U.S. public holidays and regular days, we used both a Welch two-sample t-test and a simple linear regression model, along with a detailed violin plot. The reason for choosing a t-test was because we wanted to compare the average delays of the independent groups (holidays and regular days). Since the variables dep_delay and is_holiday have different sample sizes, we determined the Welch two-sample t-test would be appropriate to gain more insights. We chose a simple linear regression model because it is crucial for finding how much flight delays differ between holidays and regular days. From this, we can also use the p-value to test statistical significance. Furthermore, the R-squared value determines how much variability there is between the delays and the impact holidays have on that departure delay. 
+To examine whether flight departure delays differ between U.S. public holidays and regular days, I used both a Welch two-sample t-test and a simple linear regression model, along with a detailed violin plot. The reason for choosing a t-test was because I wanted to compare the average delays of the independent groups (holidays and regular days). Since the variables dep_delay and is_holiday have different sample sizes, I determined the Welch two-sample t-test would be appropriate to gain more insights. I chose a simple linear regression model because it is crucial for finding how much flight delays differ between holidays and regular days. From this, we can also use the p-value to test statistical significance. Furthermore, the R-squared value determines how much variability there is between the delays and the impact holidays have on that departure delay. 
 
 T-test:
 	The Welch two-sample t-test resulted in a p-value of 0.7023. Since the p-value is much higher than 0.05, we fail to reject the null hypothesis. There is not enough statistical evidence to determine that there is a difference in the average departure delay between US public holidays and regular days. The 95% confidence interval is [-1.003987, 1.490327]. Since this interval includes zero, our decision to reject the null hypothesis is supported. Based on the t-test analysis, we can conclude that there is no significant evidence that shows that holidays have impacts on departure delays.
@@ -505,63 +503,15 @@ Thursday > Monday = Friday > Sunday = Wednesday > Tuesday > Saturday
 
 # Conclusion
 
-In conclusion, we found that of the variables we investigated, the time of year, airlines, weather conditions, and the day of the week had a significant impact on departure delays in New York airports in 2013. In contrast, we did not find any significant evidence that flight distance or U.S. public holidays affected departure delays. 
+The time of year, airlines, weather conditions, and the day of the week had a significant impact on departure delays in New York airports in 2013. In contrast, I did not find any significant evidence that flight distance or U.S. public holidays affected departure delays. 
 
-We found that the time of year had the biggest impact on flight delays, especially in June and July. This may be due to increased travel during the summer. We also observed that certain airlines consistently underperformed—like Frontier, ExpressJet, and Mesa—while JetBlue, Delta, and American had fewer delays. This information on certain airlines can guide consumer decisions and airline accountability. Although weather conditions were found to be statistically significant to departure delays, the effect was found to be minimal and mostly impactful during extreme weather conditions. Finally, the day of the week was also found to have a significant impact on departure delays. Mondays, Thursdays, and Fridays were the busiest travel days, which may be a reflection of days with more business travel.
+The time of year had the biggest impact on flight delays, especially in June and July. This may be due to increased travel during the summer. I also observed that certain airlines consistently underperformed—like Frontier, ExpressJet, and Mesa— while JetBlue, Delta, and American had fewer delays. This information on certain airlines can guide consumer decisions and airline accountability. Although weather conditions were found to be statistically significant to departure delays, the effect was found to be minimal and mostly impactful during extreme weather conditions. Finally, the day of the week was also found to have a significant impact on departure delays. Mondays, Thursdays, and Fridays were the busiest travel days, which may be a reflection of days with more business travel.
 
-One of our main limitations during our analysis was that the R-squared values were low, meaning our models only explained a small portion of delay variation. So while our analysis was useful, including more factors such as airport traffic and exploring the interaction of factors could improve the accuracy of our models in the future.
+The main limitations during the analysis was that the R-squared values were low, meaning our models only explained a small portion of delay variation. So while our analysis was useful, including more factors such as airport traffic and exploring the interaction of factors could improve the accuracy of our models in the future.
 
-Our initial objective was to find out if airlines can improve scheduling due to any key factors. By analyzing and understanding these patterns, we can find key insights about which factors affect flight delays. Using our analysis and observations, airlines could take into account the time of year, weather conditions, and day of the week when scheduling to limit flight delays. Hence, the efficiency of airports can be improved using our analysis. 
+The initial objective was to find out if airlines can improve scheduling due to any key factors. By analyzing and understanding these patterns, I can find key insights about which factors affect flight delays. Using our analysis and observations, airlines could take into account the time of year, weather conditions, and day of the week when scheduling to limit flight delays. Hence, the efficiency of airports can be improved using our analysis. 
 
-\newpage
 
-# Authors' contributions:
-
-Rithi Krishnaraj: 
-
-* EDA’s 5&6 from project proposal 
-* Midterm Project Presentation
-* Midterm Project Speech
-* Statistical Analysis 5 (weather conditions) 
-* Final Report Outlining
-  
-Bhuvana Kotha:
-
-* EDA 1 and analysis
-* Statistical analysis 1–  Time of Year vs departure delays
-* Final & midterm presentation
-* Preliminary results and analysis
-* Final Report 
-
-Preethi Thota:
-
-* Project Proposal(overall objective, methodology, timeline, backup plans)
-* EDA 4 analysis
-* Analysis 4 - U.S. Public Holidays and their effects on delay
-* Final presentation - conclusion and findings
-* Final report conclusions and discussion
-  
-Trisha Siva:
-
-* Project Proposal 
-* EDA 3
-* Statistical Analysis 3 
-  
-Joshua Wang:
-
-* Proposal (variables of interest)
-* EDA 6 presentation
-* Midterm Presentation (data processing)
-* Analysis 6 - Day of the week vs. departure delay
-* Final report conclusions and discussion
-* Rmd File Compilation
-
-Will Kirkpatrick:
-
-* EDA 2
-* Data Cleaning
-* Stat analysis and code of 2
-* Code for stat 3 
 
 
 
