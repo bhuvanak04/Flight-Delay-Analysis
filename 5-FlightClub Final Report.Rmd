@@ -1,0 +1,568 @@
+---
+title: "Flight Club Final Report"
+author: "Rithi Krishnaraj, Bhuvana Kotha, Trisha Siva, Preethi Thota, Will Kirkpatrick, Joshua Wang"
+date: "2025-06-09"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-packages, message=FALSE, warning=FALSE, echo=FALSE}
+library(nycflights13)
+library(dplyr)
+library(lubridate)
+library(timeDate)
+library(ggplot2)
+```
+
+# Introduction
+
+### Background & Purpose
+
+For our project, we are going to explore the causes of flight delays in New York airports in 2013 through analysis of the `nycflights13` dataset. Flight delays impacts millions of people who use airplanes every day, and delays can cause various problems such as financial loss, frustration, and missing connection flights. By identifying key factors that predict flight delays, many airlines can improve scheduling. By conducting this analysis, we hope to increase the efficiency of airports and decrease problems faced due to flight delays. 
+
+### Research Questions
+
+We will conduct out analysis by splitting it into 6 research questions about individual factors of interest. We want to determine if they are significant factors behind flight delays. If they seemed to affect flight delays, we also wanted to identify how much of an impact they had.
+
+1) *Does the time of year influence flight delays? (Bhuvana)*
+  - Ho: Median departure delay is the same throughout the year
+  - Ha: Median departure delay is different at least one part of the year
+2) *Which airline has the highest and lowest average delays? (Will)*
+  - Ho: There is no significant difference between the departure times between airlines
+  - Ha: There is a significant difference between the departure times between airlines
+3) *Does the distance traveled by the flight affect the delay departure of a flight? (Trisha)*
+  - Ho: There is no correlation between the distance traveled and the departure delay of a flight.
+  - Ha: There is a correlation between the distance traveled and the departure delay of a flight.
+4) *Do flights have more delays if it is a US public holiday, compared to regular days? (Preethi)*
+  - Ho: There is no difference in the departure delay between US public holidays and regular days.
+  - Ha: There is a difference in the departure delay between US public holidays and regular days.
+5) *How do different weather conditions impact flight delays (like temperature, precipitation, visibility, etc)? (Rithi)*
+  - Ho: there is no difference between weather conditions in influencing flight delays
+  - Ha: at least one weather condition is different in influencing flight delays
+6) *Does the day of the week influence departure delays? (Joshua)*
+  - Ho: Departure delay is the same for every day of the week
+  - Ha: At least one day of the week has significantly different departure delays than the other days of the week
+	
+\newpage
+
+# Data Description & Preparation: 
+
+### Data Source
+
+The primary dataset used in this analysis is `nycflights13`, which includes several interconnected tables providing detailed information about all flights departing New York City in 2013. The main tables and their structures are as follows:
+
+* flights: 336,776 rows × 19 columns
+* airports: 1,458 rows
+* planes: 3,322 rows
+* airlines: 16 rows
+* weather: 26,115 rows × 15 columns
+
+### Variables of Interest
+
+Primary Response Variable: dep_delay
+
+Our analysis focuses on the following factors:
+
+* Flight information: dep_delay, arr_delay, carrier, origin, dest, distance, air_time, flight
+* Weather information: temp, wind_speed, precip, visib, humid
+* Time information: month, day, hour
+
+### Data Cleaning and Processing
+
+To ensure accuracy of our analysis, we marked or deleted cancelled flights by setting dep_delay to NA, allowing us to handle cancellations in further analysis. We deleted all rows with zero distance or air_time since such observations weren't providing useful patterns. We truncated negative dep_delay to zero to avoid early departures from distorting the delay measures. We trimmed all the variables to remove the impact of outliers. We converted sched_dep_time, dep_time, sched_arr_time, and similar fields from HHMM ints to proper date-time variables, to enable the accurate calculations of wait time and to eliminate the need to group in performing the join with the weather data. Lastly, since the variable plane_age had many missing or idiosyncratic entries which reduced its utility, we omitted it from the majority of our analysis.
+
+\newpage
+
+# Exploratory Data Analysis
+
+### EDA 1: Time Series Plot of Delays Across Days and Months
+
+```{r eda1, echo=FALSE}
+flights_date <- flights %>%
+filter(!is.na(dep_delay)) %>%
+mutate(date = as.Date(paste(year, month, day, sep = "-"))) %>% group_by(date) %>%
+summarize(avg_dep_delay = mean(dep_delay, na.rm = TRUE))
+# Time series plot
+ggplot(flights_date, aes(x = date, y = avg_dep_delay)) + geom_line(color = "darkblue") +
+xlab("Date") +
+ylab("Average departure delay (minutes)") + ggtitle("Time Series of Average Departure Delays") 
+```
+
+Time Series Analysis: 
+The time series plot shows daily average departure delays for flights throughout 2013. Most days have relatively low delays, typically under 20 minutes, but there are frequent spikes that indicate specific days with significant disruptions. One of the largest spikes occurs in late March, with delays exceeding 80 minutes, suggesting a major event or disruption. During the summer months (June to August), the frequency and intensity of delay spikes increase, which may be due to higher passenger volumes and weather-related issues. Another period of elevated delays appears in December, likely connected to holiday travel. Overall, the delays do not follow a consistent upward or downward trend but instead reflect short-term, event-driven fluctuations. These seasonal patterns and irregular spikes highlight the impact of external factors like weather, holidays, or operational challenges on flight punctuality.
+
+### EDA 2: Boxplot of Departure Delays by Airline
+
+```{r eda2, echo=FALSE}
+# merge flights with airlines to get airline names; filter out missing delays
+flights_airline <- flights %>%
+  filter(!is.na(dep_delay)) %>%
+  left_join(airlines, by = "carrier")
+
+# boxplot: compare departure delays by airline, faceted by airport (origin)
+ggplot(flights_airline, aes(x = name, y = dep_delay)) +
+  geom_boxplot() +
+  facet_wrap(~ origin) +
+  labs(
+    x = "airline",
+    y = "departure delay (minutes)",
+    title = "boxplot of departure delays by airline and airport"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Here is a boxplot of departure delay (in minutes) versus carrier for three New York City airports: EWR, JFK, and LGA, carriers on the x-axis, departure delay from –25 through 110 minutes on y. Box plots cover IQR for each carrier–airport combination, with a bold line at the median; whiskers extend to 1.5 × IQR, and light points represent outliers. Central tendency and spread in on-time performance between terminals and between carriers are well represented in this plot.
+
+The mainline network airlines (Delta, JetBlue, American, United) cluster around a median at or slightly above zero, with reasonably narrow interquartile ranges (IQRs) on the order of 0–10 minutes. Regionals and low-cost carriers, such as ExpressJet, Frontier, and Mesa, on the other hand, have significantly larger IQRs (ranging from 10 to 30 minutes) with longer upper whiskers, indicating higher schedule volatility. Newark (EWR) is the worst for ExpressJet and Frontier, with medians in the 10–15 minute range and upper outliers exceeding 75 minutes. JFK, LGA, similarly, all have slightly negative median delays, but regionals systematically have a tail of extreme delays. Observe, however, that all airlines have some flights that are more than 100 minutes late, a reminder that even the best airlines occasionally have bad outliers. These EDA findings confirm that median departure delay is an appropriate summary measure for on-time performance, e.g., identifying the most sensitive airlines and airports to operating disturbances using the IQR width and even the presence of extreme outliers. From these, our objective is to predict the for every carrier, then build a regression model for delay for a given carrier, origin airport, weather, etc. We also segment the analysis by peak versus off-peak periods to control for slot saturation and isolate carrier effects even further.
+
+### EDA 3: Scatter Plot with means for Relationship between Flight Distance and Departure Delay
+
+```{r eda3, echo=FALSE, warning = FALSE}
+flights_distance <- flights %>%
+  filter(!is.na(dep_delay), !is.na(distance))
+
+ggplot(flights_distance, aes(x = distance, y = dep_delay)) +
+  geom_point(alpha = 0.1, color = "blue") +
+  stat_summary(fun = mean, geom = "line", color = "green", linewidth = 1) +
+  labs(
+    x = "Distance (miles)",
+    y = "Departure Delay (minutes)",
+    title = "Departure Delay vs. Flight Distance"
+  ) +
+  theme_minimal()
+```
+
+This scatter plot shows the relationship between flight distance and departure delay, with each blue dot representing a single flight and the green line indicating the average delay across distances. Most flights are clustered under 2,000 miles with delays near zero, and while a few outliers show extreme delays, they are rare. The green trend line remains nearly flat, suggesting that there is no meaningful change in average delay as flight distance increases. This supports the statistical finding that the Pearson correlation is close to zero, meaning distance has little to no practical effect on departure delays.
+
+### EDA 4: Violin Plot: Effect of Holidays on Flight Departure Delay
+
+```{r eda4, echo=FALSE}
+# creates a date column and a is_holiday column
+holidayf <- flights %>% 
+  filter(!is.na(dep_delay)) %>%
+  mutate(date = as.Date(paste(year, month, day, sep = "-")),
+         is_holiday = !isHoliday(timeDate::timeDate(date))) %>% 
+  arrange(year, month, day) %>% 
+  relocate(date, is_holiday, .after=day)
+
+# violin plot of distribution of departure delay during holidays and non-holidays
+ggplot(data = holidayf, mapping = aes(x = is_holiday, y = dep_delay, fill = is_holiday)) +
+  geom_violin() + 
+  coord_cartesian(ylim = c(-20, 100)) + 
+    ggtitle("Effect of Holidays on Flight Departure Delay") +
+    xlab("Is Holiday") +
+    ylab("Departure Delay (min)") + 
+  theme_minimal()
+```
+
+This exploratory data analysis helped us to determine the relationship between holidays and flight delays, and find if it is a significant factor. From the violin plot in this EDA, we found that the distribution of both US holidays and non-holidays are similar. Both of the spreads also show consistent shorter delays, while there are a few longer delays. Based on the analysis, we can see that holidays do not particularly lead to longer delays. This helped us to recognize that even though there are likely not many differences between holiday delays and regular days, further analysis could be useful in finding any differences. We will use the t-test and linear regression to find any further observations. 
+
+### EDA 5: Violin Plots of Distribution of Departure Delays by Weather Conditions
+
+```{r eda5, echo=FALSE}
+# join flights with weather data
+flights_weather <- flights |>
+  filter(!is.na(dep_delay)) |>
+  left_join(weather, by = c("year", "month", "day", "origin", "hour"))
+
+#violin plots
+flights_weather_grouped <- flights_weather |>
+  filter(!is.na(dep_delay), !is.na(temp), !is.na(precip), 
+         !is.na(wind_speed), !is.na(visib), !is.na(humid)) |>
+  mutate(
+    temp_group = cut(temp, breaks = c(-Inf, 32, 60, 80, Inf),
+                     labels = c("Freezing", "Cool", "Warm", "Hot")),
+    precip_group = cut(precip, breaks = c(-Inf, 0, 0.1, 0.5, Inf),
+                       labels = c("None", "Light", "Moderate", "Heavy")),
+    wind_group = cut(wind_speed, breaks = c(-Inf, 5, 15, Inf),
+                     labels = c("Calm", "Breezy", "Windy")),
+    visib_group = cut(visib, breaks = c(-Inf, 2, 5, 10, Inf),
+                      labels = c("Very Low", "Low", "Moderate", "High")),
+    humid_group = cut(humid, breaks = c(-Inf, 30, 60, 80, Inf),
+                      labels = c("Dry", "Moderate", "Humid", "Very Humid"))
+  )
+
+# define reusable violin plot function
+make_violin <- function(var, label) {
+  ggplot(flights_weather_grouped, aes_string(x = var, y = "dep_delay", fill = var)) +
+    geom_violin() +
+    coord_cartesian(ylim = c(-20, 100)) +
+    ggtitle(paste(label)) +
+    xlab(label) +
+    ylab("Departure Delay (min)") +
+    theme_minimal() +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 30, hjust = 1))
+}
+
+# plot each
+v_temp <- make_violin("temp_group", "Temperature")
+v_precip <- make_violin("precip_group", "Precipitation")
+v_wind <- make_violin("wind_group", "Wind Speed")
+v_visib <- make_violin("visib_group", "Visibility")
+v_humid <- make_violin("humid_group", "Humidity")
+
+v_temp
+v_precip
+v_wind
+v_visib
+v_humid
+```
+
+From this exploratory data analysis, we found that flight delays increase at more extreme temperatures, usually under 30 degrees and above 80 degrees Fahrenheit. When precipitation is high, both the median delay and the spread of delays grows quickly, indicating that heavy rain influences the increase of departure delays. For wind speeds, high wind speeds start to show more variability and some delays. This could mean that wind speed isn’t a major determinant of flight delays. Reduced visibility correlates with longer delays, while departure punctuality worsens in foggy conditions. Finally, high humidity has a minimal impact on flight delays, especially less than precipitation or low visibility. 
+
+### EDA 6: Multiple Boxplot Graph - Distribution of Departure Delays by Day of the Week
+
+```{r eda6, echo=FALSE}
+flights_wday <- flights %>%
+  filter(!is.na(dep_delay)) %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE, week_start = 7)  
+  )
+ggplot(flights_wday, aes(x = wday, y = dep_delay, fill = wday)) +
+  geom_boxplot(outlier.size = 0.5, outlier.color = "grey", outlier.alpha = 0.1) +
+  coord_cartesian(ylim = c(-20, 60)) +
+  xlab("Day of Week") +
+  ylab("Departure Delay (minutes)") +
+  ggtitle("Distribution of Departure Delays by Day of Week") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+This multiple boxplot graph shows the distribution of departure delays across the days of the week (Monday, …, Sunday). Although the medians and first quartile appear to be equal, the third quartile for each distribution, and by extension, the skewness of each distribution, varies a lot. Thursday appears to have the greatest third quartile, indicating that it has the greatest right skew and is more likely to have the greatest mean departure delay. Saturday, on the other hand, has the least third quartile, indicating it has the least amount of skew and most likely has the smallest mean departure delay. Overall, this indicates that there may exist significant statistical evidence that departure delays are impacted by the day of the week.
+
+\newpage
+
+# Statistical Analysis
+
+### Analysis 1: Time of Year
+
+```{r data, echo=FALSE}
+flights_month <- flights %>%
+  filter(!is.na(dep_delay)) %>%
+  mutate(
+    month = factor(month, labels = month.name)
+  )
+
+ggplot(flights_month, aes(x = month, y = dep_delay, fill = month)) +
+  geom_boxplot(outlier.size = 0.5) +
+  coord_cartesian(ylim = c(-20, 100)) +
+  labs(
+    title = "Departure Delays by Month",
+    x = "Month",
+    y = "Departure Delay (min)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+```
+
+Boxplot Analysis: Departure Delays by Month
+This boxplot shows how departure delays vary across different months of 2013. From the plot, it’s clear that June and July have the highest median delays, with larger interquartile ranges and more extreme outliers, suggesting more variability and frequent long delays in summer. In contrast, months like September and October have the lowest median delays and smaller spreads, indicating more consistent and timely departures. December also shows a noticeable increase in delay times, likely due to holiday travel. Overall, this visualization suggests that summer and holiday seasons experience greater delays, possibly due to high passenger volume or weather-related issues.
+
+```{r, echo=FALSE}
+kruskal.test(dep_delay ~ month, data = flights_month)
+```
+
+Statistical Test: Kruskal-Wallis Test on Departure Delays by Month
+To test whether departure delays differ significantly across months, a Kruskal-Wallis rank sum test was conducted. The test result shows a chi-squared value of 8668.9 with 11 degrees of freedom and a p-value less than 2.2e-16. Since the p-value is extremely small, we reject the null hypothesis, indicating that there is a statistically significant difference in departure delays between at least some months. This supports the patterns seen in the boxplot, where certain months (like June, July, and December) clearly show more delays than others.
+
+```{r, echo=FALSE}
+model_month <- lm(dep_delay ~ month, data = flights_month)
+summary(model_month)
+```
+
+Linear Model: Departure Delays by Month
+The linear model summary shows how average departure delays vary by month, using January as the baseline (intercept). Most monthly coefficients are statistically significant (p < 0.001), indicating strong evidence of differences in delays across months. June and July show the highest positive coefficients (10.81 and 11.69), meaning flights in those months experience delays about 11 minutes longer than in January on average. In contrast, months like September, October, and November have negative coefficients, indicating shorter delays compared to January. The model's R-squared is low (about 0.016), meaning month alone explains only a small portion of the variation in delays, but the month effect is still statistically significant (F-statistic p-value < 2.2e-16). This supports earlier findings that delay patterns shift across the year, with summer and December generally showing higher delays.
+
+```{r, echo=FALSE}
+model_month <- lm(dep_delay ~ month, data = flights_month)
+
+# 2x2 diagnostic plots
+par(mfrow = c(2, 2))
+plot(model_month)
+```
+
+Linear Model for Departure Delay by Month
+The diagnostic plots for the linear model reveal several issues with model assumptions. In the Residuals vs Fitted plot, the spread of residuals is uneven and shows signs of heteroscedasticity (non-constant variance), especially at higher fitted values. The Q-Q plot shows strong deviations from the diagonal line in both tails, indicating non-normality of residuals. The Scale-Location plot confirms the heteroscedasticity, as the spread of residuals increases with fitted values. Lastly, the Residuals vs Leverage plot highlights a few influential points with high leverage and large residuals, suggesting potential outliers. Overall, while the model shows significant monthly effects, these plots indicate that the assumptions of linear regression are violated, and a more robust model may be needed to better fit the data.
+
+```{r, echo=FALSE}
+anova_model <- aov(dep_delay ~ month, data = flights_month)
+summary(anova_model)
+
+TukeyHSD(anova_model)
+```
+
+ANOVA and Tukey HSD: Monthly Differences in Departure Delays
+I then used ANOVA to compare mean departure delays across months, and the results were highly significant (F = 482.8, p < 2.2e-16), confirming that delays differ significantly between months. To explore which months differ, a post-hoc Tukey HSD test was performed. The output shows that most pairwise comparisons between months are statistically significant (p < 0.05), especially comparisons involving June, July, and December, which consistently have higher delay means compared to other months.
+For example:
+July delays are significantly higher than in all other months (e.g., July–January diff = 11.69 mins, p < 0.000001).
+November has much lower delays compared to summer months like June and July (e.g., November–July diff = -16.29 mins).
+Differences between some months (e.g., February–January and May–March) are not significant, suggesting similar delay patterns.
+This analysis supports the earlier findings from the boxplot and linear model, showing that summer and holiday months tend to have longer delays, while fall months like September, October, and November have shorter delays.
+
+Overall Conclusions and Validations
+For Statistical Analysis 1, I chose a combination of non-parametric (Kruskal-Wallis) and parametric models (linear regression and ANOVA) to assess how departure delays vary by month. These were chosen because the Kruskal-Wallis test doesn’t assume normality, which fits our data’s skewed distribution, while the linear model and ANOVA provide interpretable comparisons between months. While no cross-validation was used, model diagnostics (residual plots, Q-Q plots) showed violations of assumptions like homoscedasticity and normality, indicating the linear model may not be the best fit despite statistically significant results (p < 2.2e-16). The R² of 0.016 shows that month explains only a small portion of the variation, suggesting low model complexity and underfitting. Tukey HSD revealed that summer and holiday months (e.g., July, December) had significantly higher delays than fall months (e.g., September, November). In future work, more robust models (e.g., mixed models or tree-based methods) with cross-validation should be used to improve predictive performance and address overfitting risks.
+
+### Analysis 2: Airline
+
+```{r, echo=FALSE}
+carrier_delays <- flights %>%
+  filter(!is.na(dep_delay)) %>%
+  left_join(airlines, by = "carrier") %>%
+  group_by(name) %>%
+  summarize(
+    mean_delay   = mean(dep_delay, na.rm = TRUE),
+    median_delay = median(dep_delay, na.rm = TRUE),
+    n_flights    = n()
+  ) %>%
+  arrange(mean_delay)
+
+#  carriers with the lowest  and highest average delay
+head(carrier_delays,  3)   # three carriers with the smallest mean delay
+tail(carrier_delays,  3)   # three carriers with the largest mean delay
+```
+
+We started off excluding flights data from any observations with missing departure-delay values, then merged with airlines lookup table such that a two-character carrier code was replaced with a complete airline name. We then grouped the cleaned data by carrier_name, then applied summarize() to calculate an airline’s average departure delay, its median departure delay, and its number of flights. We ordered carriers from least delayed average-wise by ordering on average_delay, then extracted three most delayed and three least delayed operators. We found that shortest average departure delays belonged to JetBlue Airways (mean 7.25 min), Delta Air Lines (8.03 min), and American Airlines (8.22 min), while longest average departure delays belonged to Frontier Airlines (20.22 min), ExpressJet Airlines (19.95 min), and Mesa Airlines (18.996 min). These observations indicate extreme on-time performance variation, partly caused by a few extreme delay incidents whose averages are inflated with small, regional carriers.
+
+### Analysis 3: Distanve of Flight
+
+```{r, echo=FALSE}
+# Filter data
+df <- flights %>%
+  filter(!is.na(distance), !is.na(dep_delay))
+
+# Pearson correlation coefficient
+pearson_r <- cor(df$distance, df$dep_delay, method = "pearson")
+print(pearson_r)
+
+# Spearman correlation coefficient
+spearman_r <- cor(df$distance, df$dep_delay, method = "spearman")
+print(spearman_r)
+
+# Correlation significance test
+cor.test(df$distance, df$dep_delay, method = "pearson")
+```
+
+Pearson Correlation
+The Pearson correlation measures the strength and direction of a linear relationship between two continuous variables. In this case, the correlation between distance and dep_delay was approximately -0.0217, with a p-value less than 2.2e-16. While this p-value is significant due to the very large sample size, the actual correlation coefficient is very close to zero. This means that there is no practical linear relationship between how far a flight travels and how delayed it is at departure.
+
+Spearman Correlation
+Spearman correlation assesses the monotonic relationship between two variables, based on their ranked values rather than raw data. It’s useful when the relationship isn’t linear but could still follow a consistent trend. In our analysis, Spearman’s p was about +0.0763, which is slightly higher than Pearson’s but still represents a weak monotonic relationship. Even when considering general trends rather than strict linearity, longer flights are only very slightly more delayed, and the relationship is still too weak to be meaningful.
+
+Conclusion
+Based on both the Pearson and Spearman correlation analyses, there is no meaningful relationship between the distance of a flight and its departure delay. Although the Pearson correlation has a statistically significant p-value, the correlation coefficient itself was nearly zero (0.0217), indicating no practical linear association. Similarly, the Spearman correlation showed only a very weak monotonic trend (+0.0763), which is still too small to be considered relevant. These results suggest that flight distance is not a useful predictor of departure delays, and any variation in delays is likely driven by other factors not captured by distance alone.
+
+### Analysis 4: Holidays
+
+```{r, echo=FALSE}
+# These are some of the US public holidays that we think could potentially cause flight delays
+us_holidays <- as.Date(c(
+  "2013-01-01",  # New Year's Day
+  "2013-05-27",  # Memorial Day
+  "2013-07-04",  # Independence Day
+  "2013-11-28",  # Thanksgiving
+  "2013-12-25",  # Christmas
+  "2013-09-02",  # Labor Day
+  "2013-11-11"   # Veterans Day
+))
+
+holidayf <- flights |>
+  mutate(date = as.Date(paste(year, month, day, sep = "-")),
+    is_holiday = ifelse(!is.na(match(date, us_holidays)), "Holiday", "Regular"))
+
+holidayf |>
+  group_by(is_holiday) |>
+  summarise(
+    avg_dep_delay = mean(dep_delay, na.rm = TRUE),
+    median_dep_delay = median(dep_delay, na.rm = TRUE),
+    count = n()
+  )
+
+# violin plot
+ggplot(holidayf, aes(x = is_holiday, y = dep_delay)) +
+  geom_violin(fill = "lightblue") +
+  stat_summary(fun = "median", geom = "point", color = "red", size = 2) +
+  coord_cartesian(ylim = c(-20, 90)) +
+  labs(title = "Departure Delay: Holiday vs Regular Days",
+       x = "Type of Day", y = "Departure Delay (mins)") +
+  theme_minimal()
+
+t.test(dep_delay ~ is_holiday, data = holidayf)
+
+# linear regression model
+lm_model <- lm(dep_delay ~ is_holiday, data = holidayf)
+summary(lm_model)
+```
+
+To examine whether flight departure delays differ between U.S. public holidays and regular days, we used both a Welch two-sample t-test and a simple linear regression model, along with a detailed violin plot. The reason for choosing a t-test was because we wanted to compare the average delays of the independent groups (holidays and regular days). Since the variables dep_delay and is_holiday have different sample sizes, we determined the Welch two-sample t-test would be appropriate to gain more insights. We chose a simple linear regression model because it is crucial for finding how much flight delays differ between holidays and regular days. From this, we can also use the p-value to test statistical significance. Furthermore, the R-squared value determines how much variability there is between the delays and the impact holidays have on that departure delay. 
+
+T-test:
+	The Welch two-sample t-test resulted in a p-value of 0.7023. Since the p-value is much higher than 0.05, we fail to reject the null hypothesis. There is not enough statistical evidence to determine that there is a difference in the average departure delay between US public holidays and regular days. The 95% confidence interval is [-1.003987, 1.490327]. Since this interval includes zero, our decision to reject the null hypothesis is supported. Based on the t-test analysis, we can conclude that there is no significant evidence that shows that holidays have impacts on departure delays.
+	
+Simple Linear Regression Model:
+The linear regression model estimates the intercept is 12.8780. The coefficient for is_holidayRegular is -0.2432 which shows that there is a slight difference between holidays and regular days, where regular days have a slightly shorter delay average than holidays. The p-value for the model is 0.6516, which is not significant. Furthermore, the R-squared value is very close to zero. This means that holidays or regular days can not predict departure delays, due to barely any variation found from the R-squared. Hence, we fail to reject the null hypothesis. Holidays or regular days do not predict flight departure delays. 
+
+Conclusion: 
+Overall, our analysis supports the conclusion that holidays do not significantly affect departure delays. While there are slightly longer delays on holidays, it is not significant. Based on both the t-test and linear regression model, there is no statistical difference between U.S. public holidays and average flight departure delays.
+
+### Analysis 5: Weather Conditions
+
+```{r, echo=FALSE}
+#multiple linear regression with key weather visibility
+model_multi <- lm(dep_delay ~ temp + precip + wind_speed + humid + visib, data = flights_weather)
+summary(model_multi)
+
+rmse_multi <- sqrt(mean(residuals(model_multi)^2))
+
+#anova
+# One-way ANOVA: departure delay ~ temperature group
+anova_temp <- aov(dep_delay ~ temp_group, data = flights_weather_grouped)
+summary(anova_temp)
+
+# Precipitation group
+anova_precip <- aov(dep_delay ~ precip_group, data = flights_weather_grouped)
+summary(anova_precip)
+
+# Wind speed group
+anova_wind <- aov(dep_delay ~ wind_group, data = flights_weather_grouped)
+summary(anova_wind)
+
+# Visibility group
+anova_visib <- aov(dep_delay ~ visib_group, data = flights_weather_grouped)
+summary(anova_visib)
+
+# Humidity group
+anova_humid <- aov(dep_delay ~ humid_group, data = flights_weather_grouped)
+summary(anova_humid)
+
+#tukey's HSD
+tukey_temp <- TukeyHSD(anova_temp)
+print(tukey_temp)
+
+tukey_prec <- TukeyHSD(anova_precip)
+print(tukey_prec)
+tukey_wind <- TukeyHSD(anova_wind)
+print(tukey_wind)
+tukey_visib <-TukeyHSD(anova_visib)
+print(tukey_visib)
+tukey_humid <-TukeyHSD(anova_humid)
+print(tukey_humid)
+```
+
+Our goal for the statistical analysis is to isolate and compare the marginal effects of each weather variable while controlling the others. 
+
+Multiple Linear Regression Model: 
+To answer this question, we developed a multiple linear regression model to quantify the effects of several weather variables - precipitation, wind speed, humidity, visibility, and temperature - on departure delays. Our outcome is continuous (departure delay in minutes) and we wanted to estimate the effect of each independent weather variable on flight delays. We first partitioned the flights_weather dataset into the different weather variables, then performed a cross-validation on the data to compare multiple models with different combinations of the five potential predictors. We selected the root-mean-square-error to measure performance because they correspond directly to any flight delays represented in minutes, allowing for easier interpretation of the results. All predictors were highly significant, with p values less than 2e10^16. The residual standard error and RMSE values were both close to 39.7 minutes, and the model’s R^2 value was around 0.028, indicating that weather conditions only account for 2.8% of the variability surrounding flight departure delays. We can conclude that most of the delays stem from non-weather variables. All predictors were centered within a range that was relevant to the research question, and residual data showed a right skew that indicated extreme delays in rare cases. 
+
+One-way ANOVA and Tukey’s HSD for Pairwise Comparisons
+
+	To illustrate differences between and within the weather conditions, we grouped each variable into categories and ran one-way ANOVA tests. All five ANOVAs were highly significant, reflecting clear between-group differences. For temperature, we saw that flights in “Hot” versus “Freezing” conditions were delayed by an average of 8.4 minutes. “Light” precipitation adds 17.4 minutes of delay, “Moderate” adds 29.3 minutes of delay, and “Heavy” adds 37.4 minutes of delay compared to not having any precipitation. When comparing “Calm” wind speeds to  “Breezy” and “Windy” speeds, we see that they add 2 and 5.3 minutes of flight delays. We also see that low visibility conditions add roughly 7 to 16 minutes of delay compared to the other groups. Lastly, we see that higher humidity groups show noticeable delays - 3.9 minutes to 13.1 minutes - when compared to moderate and dry conditions. These pairwise comparisons from the Tukey HSD analysis reinforce the linear regression findings, that heavier precipitation, extreme temperatures, higher wind speeds, low visibility, and high humidity are the most influential in causing flight departure delays. 
+
+Overall
+
+	The modeling and validation steps demonstrate that while weather factors do have a statistically significant influence on departure delays, the magnitude of their contribution is relatively small to the overall causes of flight delays. The weather variables follow the predictions made earlier that extreme weather conditions influence flight delays. Further statistical models can be conducted to cross-validate and improve explanatory performance of the research question, but we can reject the null hypothesis and conclude that different weather conditions do impact flight departure delays. 
+
+### Analysis 6: Day of the Week
+
+```{r diagnostic-plots, echo=FALSE}
+anova_wday <- aov(dep_delay ~ wday, data = flights_wday)
+par(mfrow = c(2,2))
+plot(anova_wday)
+```
+
+To check if there exists a significant difference between the departure delays of the days of the week, an ANOVA test would be performed because we want to investigate the impact of a factor with more than 2 levels (day of the week) on a response variable (departure delay). First, the 3 base assumptions for ANOVA (normality, homoscedasticity, independence) were checked using diagnostic plots. The Residual vs. Fitted plot indicates a great number of positive residuals, indicating heteroscedasticity. This is further supported by the Scale-Location plot, which indicates that the spread of residuals increases with greater fitted values. The normal Q-Q plot shows a great number of positive residuals on the right side of the graph that deviate from the normal Q-Q line, indicating non-normality. Finally, the Residuals vs. Leverage plot indicates a great number of influential outliers in the data. While the independence assumption is difficult to verify through graphical and numerical means, we reasonably assume that individual flights are independent observations. In conclusion, while we can assume that the independence of observations, we cannot assume normality and homoscedasticity. Therefore, a more robust ANOVA model will need to be used.
+
+```{r Kruskal-Wallis, echo=FALSE}
+kruskal.test(dep_delay ~ wday, data = flights_wday)
+```
+
+The Kruskal-Wallis test is a non-parametric ANOVA test that works even without the normality and homoscedasticity assumptions. The null hypothesis is that all group medians are equal, and the alternative hypothesis is that at least one group median is different from the rest. With a chi-square of 1688.1 and degrees of freedom of 6, the p-value obtained is 2.2e-16. Since the p-value is extremely low, we can reject the null hypothesis, indicating that the distribution of departure delays does vary by the day of the week.
+
+```{r Lin-reg, echo=FALSE}
+lm_wday <- lm(dep_delay ~ factor(wday), data = flights_wday)
+summary(lm_wday)
+par(mfrow = c(2,2))
+plot(lm_wday)
+```
+
+A linear regression model was made using the days of the week as a categorical predictor to see if departure delays could be forecasted. Although the coefficients were mostly statistically significant, the multiple R-squared is extremely low, indicating that this model explains a very low amount of variation in departure delay. Although this supports the conclusion from the Kruskal-Wallis test, a linear regression model is unreliable to predict departure delays from the day of the week.
+
+```{r Tukey-HSD, echo=FALSE}
+TukeyHSD(anova_wday)
+```
+
+To explore which days of the week are different from each other, Tukey’s HSD test was used for a pairwise comparison and ranking of mean departure delays. The results indicate that the pair Monday & Friday and the pair Sunday & Wednesday are not significantly different from each other. Thursday has the greatest mean departure delays, followed by Monday & Friday, followed by Sunday & Wednesday, followed by Tuesday. Finally, Saturday had the lowest mean departure delay. In summary:
+Thursday > Monday = Friday > Sunday = Wednesday > Tuesday > Saturday
+
+\newpage
+
+# Conclusion
+
+In conclusion, we found that of the variables we investigated, the time of year, airlines, weather conditions, and the day of the week had a significant impact on departure delays in New York airports in 2013. In contrast, we did not find any significant evidence that flight distance or U.S. public holidays affected departure delays. 
+
+We found that the time of year had the biggest impact on flight delays, especially in June and July. This may be due to increased travel during the summer. We also observed that certain airlines consistently underperformed—like Frontier, ExpressJet, and Mesa—while JetBlue, Delta, and American had fewer delays. This information on certain airlines can guide consumer decisions and airline accountability. Although weather conditions were found to be statistically significant to departure delays, the effect was found to be minimal and mostly impactful during extreme weather conditions. Finally, the day of the week was also found to have a significant impact on departure delays. Mondays, Thursdays, and Fridays were the busiest travel days, which may be a reflection of days with more business travel.
+
+One of our main limitations during our analysis was that the R-squared values were low, meaning our models only explained a small portion of delay variation. So while our analysis was useful, including more factors such as airport traffic and exploring the interaction of factors could improve the accuracy of our models in the future.
+
+Our initial objective was to find out if airlines can improve scheduling due to any key factors. By analyzing and understanding these patterns, we can find key insights about which factors affect flight delays. Using our analysis and observations, airlines could take into account the time of year, weather conditions, and day of the week when scheduling to limit flight delays. Hence, the efficiency of airports can be improved using our analysis. 
+
+\newpage
+
+# Authors' contributions:
+
+Rithi Krishnaraj: 
+
+* EDA’s 5&6 from project proposal 
+* Midterm Project Presentation
+* Midterm Project Speech
+* Statistical Analysis 5 (weather conditions) 
+* Final Report Outlining
+  
+Bhuvana Kotha:
+
+* EDA 1 and analysis
+* Statistical analysis 1–  Time of Year vs departure delays
+* Final & midterm presentation
+* Preliminary results and analysis
+* Final Report 
+
+Preethi Thota:
+
+* Project Proposal(overall objective, methodology, timeline, backup plans)
+* EDA 4 analysis
+* Analysis 4 - U.S. Public Holidays and their effects on delay
+* Final presentation - conclusion and findings
+* Final report conclusions and discussion
+  
+Trisha Siva:
+
+* Project Proposal 
+* EDA 3
+* Statistical Analysis 3 
+  
+Joshua Wang:
+
+* Proposal (variables of interest)
+* EDA 6 presentation
+* Midterm Presentation (data processing)
+* Analysis 6 - Day of the week vs. departure delay
+* Final report conclusions and discussion
+* Rmd File Compilation
+
+Will Kirkpatrick:
+
+* EDA 2
+* Data Cleaning
+* Stat analysis and code of 2
+* Code for stat 3 
+
+
+
+
